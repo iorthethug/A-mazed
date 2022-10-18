@@ -8,8 +8,11 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 
 /**
  * <code>ForkJoinSolver</code> implements a solver for
@@ -25,9 +28,12 @@ public class ForkJoinSolver
     extends SequentialSolver
 {
 
+    
+    private List<ForkJoinSolver> forkList = new ArrayList<ForkJoinSolver>();
+    static private boolean goalFound = false;
+    static private ConcurrentSkipListSet<Integer> reserved = new ConcurrentSkipListSet<>();
+    private Set <Integer> thisReserved = new HashSet<>();
 
-    List<ForkJoinSolver> forkLista = new ArrayList<ForkJoinSolver>();
-    static boolean goalFound = false;
     /**
      * Creates a solver that searches in <code>maze</code> from the
      * start node to a goal.
@@ -97,7 +103,7 @@ public class ForkJoinSolver
                 goalFound = true;
                 // move player to goal
                 maze.move(player, current);
-                System.out.println(forkLista);
+                System.out.println(forkList);
 
                 // search finished: reconstruct and return path
                 
@@ -119,27 +125,29 @@ public class ForkJoinSolver
 
                 for (int i = 0; i < availablePaths.size(); i++) {
                     int nb = availablePaths.get(i);
-                    
-                    if (availablePaths.size() - i > 1) {
 
+                    if(reserved.add(nb)){ // Kan bytas mot visited om vi byter till concurrentskiplist set Checks the reserved list to see if some other fork have reserved that spot
+                        if (availablePaths.size() - i > 1) {
+                            //reserved.add(nb);
+                            System.out.println(reserved.size());
+                            ForkJoinSolver subtask = new ForkJoinSolver(maze, visited, nb);
                         
-                        ForkJoinSolver subtask = new ForkJoinSolver(maze, visited, nb);
-                        subtask.predecessor = new HashMap<>(predecessor);
-                        subtask.predecessor.put(nb, current);
-                        subtask.fork();
-                        forkLista.add(subtask);
-                        
-                    } else {
-                        
-                        frontier.push(nb);
-                        predecessor.put(nb, current);
+                            subtask.predecessor = new HashMap<>(predecessor);
+                            subtask.predecessor.put(nb, current);
+
+                            subtask.fork();
+                            forkList.add(subtask);
+
+                        } else if (!visited.contains(nb)){
+                            frontier.push(nb);
+                            predecessor.put(nb, current);
+                        }
                     }
-                    
                 }
             }
         }
         
-        for (ForkJoinSolver subtask : forkLista) {
+        for (ForkJoinSolver subtask : forkList) {
            if (subtask.join() != null){
                 return subtask.join();
            }
@@ -155,8 +163,12 @@ public class ForkJoinSolver
             List<Integer> availableNeighbours = new ArrayList<>();
 
             for (Integer nb : maze.neighbors(current)) {
-                if(!visited.contains(nb))
-                availableNeighbours.add(nb);
+                if(!visited.contains(nb) && !reserved.contains(nb)){
+                  //
+                    //reserved.add(nb);
+                    //thisReserved.add(nb);
+                    availableNeighbours.add(nb);
+                }
             }
             return availableNeighbours;
         }
