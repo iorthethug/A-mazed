@@ -27,7 +27,7 @@ public class ForkJoinSolver
 
 
     List<ForkJoinSolver> forkLista = new ArrayList<ForkJoinSolver>();
-    
+    static boolean goalFound = false;
     /**
      * Creates a solver that searches in <code>maze</code> from the
      * start node to a goal.
@@ -82,31 +82,37 @@ public class ForkJoinSolver
 
         // one player active on the maze at start
         int player = maze.newPlayer(start);
-        System.out.println("första" + start);
+
         // start with start node
         frontier.push(start);
 
         // as long as not all nodes have been processed
-        while (!frontier.empty()) {
+        while (!frontier.empty() && !goalFound) {
             // get the new node to process
             int current = frontier.pop();
 
             // if current node has a goal
             if (maze.hasGoal(current)) {
+
+                goalFound = true;
                 // move player to goal
                 maze.move(player, current);
                 System.out.println(forkLista);
 
                 // search finished: reconstruct and return path
-                System.out.println("andra" + start);
+                
+                start = maze.start();
                 return pathFromTo(start, current);
             }
             // if current node has not been visited yet
             if (!visited.contains(current)) {
                 // move player to current node
-                maze.move(player, current);
-                // mark node as visited
                 visited.add(current);
+            
+                maze.move(player, current);
+                
+                // mark node as visited
+                
                 // for every node nb adjacent to current
         
                 List<Integer> availablePaths = availablePaths(current);
@@ -118,7 +124,8 @@ public class ForkJoinSolver
 
                         
                         ForkJoinSolver subtask = new ForkJoinSolver(maze, visited, nb);
-                        
+                        subtask.predecessor = new HashMap<>(predecessor);
+                        subtask.predecessor.put(nb, current);
                         subtask.fork();
                         forkLista.add(subtask);
                         
@@ -131,9 +138,10 @@ public class ForkJoinSolver
                 }
             }
         }
+        
         for (ForkJoinSolver subtask : forkLista) {
            if (subtask.join() != null){
-               return subtask.join();
+                return subtask.join();
            }
          }
          return null;
