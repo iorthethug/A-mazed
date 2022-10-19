@@ -1,1 +1,11 @@
 # A-mazed
+Grupp 38
+Adam Williams, Jonathan Naumanen
+
+Programmet skapar nya trådar varje gång mer än två vägar kan väljas för en tråd, då skapar den en ny tråd för den ena vägen och går den andra vägen själv. På så sätt behöver tråden aldrig “hoppa bakåt” för att leta i outforskade vägar. Vi gjorde på det här sättet då vi ville att vårt program skulle vara så parallellt som möjligt men en mer optimal lösning hade använt färre trådar då det är lite för dyrt att skapa såhär många trådar i förhållande till hur mycket jobb varje tråd behöver göra.
+
+Vi har återanvänt “depthFirstSearch” koden från “sequentialSolver” programmet men modifierat den för att se till att programmet kan skapa nya trådar och köra dem parallellt. 
+
+Vi refaktorera ut funktionen som kikar vilka vägar som är tillgängliga att gå på och har två kontroller i den funktionen som säkerställer att inga “data races” kan uppstå. Vi använder oss både av den givna “Set<> visited”  men även en ny “ConcurrentSkipListSet” som kan reservera platser ifall det inte fanns en ledig tråd för tillfället. Detta säkerställer att inte fler än en tråd kan besöka och skapas på samma ruta eftersom det kan vara så att två trådar har gått förbi samma nod men inte haft möjlighet att skapa en tråd vid just det tillfället.
+
+Våran lösning följer de krav som krävdes av oss på uppgiften men eftersom det alltid finns förbättringar att göra så hade vi velat testa programmera ännu en lösning som använder sig av konceptet “work stealing” ifall tiden fanns. 
