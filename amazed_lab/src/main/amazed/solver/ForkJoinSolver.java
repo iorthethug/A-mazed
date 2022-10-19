@@ -6,13 +6,10 @@ import java.util.LinkedList;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.atomic.AtomicIntegerArray;
+
 
 /**
  * <code>ForkJoinSolver</code> implements a solver for
@@ -28,11 +25,12 @@ public class ForkJoinSolver
     extends SequentialSolver
 {
 
-    
+    //Alla processorer har en egen lista med sina subtasks
     private List<ForkJoinSolver> forkList = new ArrayList<ForkJoinSolver>();
-    static private boolean goalFound = false;
-    static private ConcurrentSkipListSet<Integer> reserved = new ConcurrentSkipListSet<>();
-    private Set <Integer> thisReserved = new HashSet<>();
+    //Check för att meddela att målet är funnet               
+    static private boolean goalFound = false;    
+    //Lista för att reservera en plats om det inte finns nog med processorer redo att starta                                          
+    static private ConcurrentSkipListSet<Integer> reserved = new ConcurrentSkipListSet<>(); 
 
     /**
      * Creates a solver that searches in <code>maze</code> from the
@@ -86,87 +84,76 @@ public class ForkJoinSolver
 
     private List<Integer> parallelSearch() {
 
-        // one player active on the maze at start
+        // En spelare spawnar varje gång vi startar mazen och när vi delar upp i subtasks
         int player = maze.newPlayer(start);
 
-        // start with start node
+        // Lägg till noden som spelaren spawna på
         frontier.push(start);
 
-        // as long as not all nodes have been processed
+        // Sålänge alla noder runtom en inte är besökta och målet inte är funnet så fortsätter loopen
         while (!frontier.empty() && !goalFound) {
-            // get the new node to process
+            // Tar ut noden som spelaren står på för att...
             int current = frontier.pop();
 
-            // if current node has a goal
+            // kika om det är målet...
             if (maze.hasGoal(current)) {
+                // Säg åt dom andra trådarna att målet är hittat
+                goalFound = true; 
 
-                goalFound = true;
-                // move player to goal
                 maze.move(player, current);
-                System.out.println(forkList);
-
-                // search finished: reconstruct and return path
-                
+                // Ändrar start till den egentliga startpunkten så att pathFromTo returnerar korrekt väg
                 start = maze.start();
                 return pathFromTo(start, current);
             }
-            // if current node has not been visited yet
+            // ..eller om den ska markeras som besökt
             if (!visited.contains(current)) {
-                // move player to current node
-                visited.add(current);
-            
+
+                visited.add(current);   
                 maze.move(player, current);
                 
-                // mark node as visited
-                
-                // for every node nb adjacent to current
         
                 List<Integer> availablePaths = availablePaths(current);
 
                 for (int i = 0; i < availablePaths.size(); i++) {
-                    int nb = availablePaths.get(i);
 
-                    if(reserved.add(nb)){ // Kan bytas mot visited om vi byter till concurrentskiplist set Checks the reserved list to see if some other fork have reserved that spot
-                        if (availablePaths.size() - i > 1) {
-                            //reserved.add(nb);
-                            System.out.println(reserved.size());
+                    int nb = availablePaths.get(i);
+           
+                        //Gör detta om det är fler än två håll att gå                     
+                        if (availablePaths.size() - i > 1) { 
+
                             ForkJoinSolver subtask = new ForkJoinSolver(maze, visited, nb);
-                        
-                            subtask.predecessor = new HashMap<>(predecessor);
+                            
+                            subtask.predecessor = predecessor;
                             subtask.predecessor.put(nb, current);
 
                             subtask.fork();
-                            forkList.add(subtask);
-
-                        } else if (!visited.contains(nb)){
+                            //Listan med sig själv och processorns subtasks
+                            forkList.add(subtask);                 
+                        } else {        
                             frontier.push(nb);
                             predecessor.put(nb, current);
                         }
-                    }
                 }
             }
         }
-        
-        for (ForkJoinSolver subtask : forkList) {
+        //När en processor är klar så vill den vänta på sina subtasks
+        for (ForkJoinSolver subtask : forkList){ 
            if (subtask.join() != null){
                 return subtask.join();
            }
          }
          return null;
-        // all nodes explored, no goal found
         
         }
 
-        // Method to return the Nodes which are not visited yet
+        // Hjälpfunktion att returnera en lista med alla grannar som är obesökta och inte reserverade
         private List<Integer> availablePaths (Integer current) {
 
             List<Integer> availableNeighbours = new ArrayList<>();
 
             for (Integer nb : maze.neighbors(current)) {
-                if(!visited.contains(nb) && !reserved.contains(nb)){
-                  //
-                    //reserved.add(nb);
-                    //thisReserved.add(nb);
+                // Kikar om någon subtask har reserverat platsen och lägger till om den inte är reserverad
+                if(!visited.contains(nb) && reserved.add(nb)){
                     availableNeighbours.add(nb);
                 }
             }
